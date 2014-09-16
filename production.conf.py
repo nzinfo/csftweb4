@@ -55,5 +55,16 @@ APP = {
             #'log': ''
         },
 
+    },
+    'dsr': {           # 当事人
+        'AppName': 'PartyInfo',
+        # DatabaseURL or  Database with db_type db_host db_port db_name db_uid db_pwd
+        'DatabaseURL': 'ibm_db_sa://Administrator:123456@192.168.2.132:50000/GAOY',
+        'DatabaseSchema': 'COURT',
+        # 自动生成 代码的存放路径
+        'BasePath': './PartyInfo',
+        'Path': {
+        },
+
     }
 }

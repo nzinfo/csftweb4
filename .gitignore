@@ -1,6 +1,7 @@
 .idea/
 data/
 CaseInfo/
+PartyInfo/
 meta/*.json
 demoapp/schema/*.py
 log/
