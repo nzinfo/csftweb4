@@ -1,0 +1,12 @@
+.idea/
+data/
+CaseInfo/
+meta/*.json
+demoapp/schema/*.py
+log/
+tasks/
+.DS_Store
+*.pyc
+~*
+csft_admin_config.json
+*.sqlite
