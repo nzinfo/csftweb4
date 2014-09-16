@@ -4,8 +4,6 @@ DEBUG = 1
 """
         代码路径包括：
         /CaseInfo       有关此频道的全部生成文件
-            /schema     索引中， 各字段的定义
-                - python 包， SQLAlchemy 风格的表结构定义
             /idx        存放实际的索引
             /data       数据
                 /db     创建索引前、创建增量索引临时存放数据的位置
@@ -18,6 +16,8 @@ DEBUG = 1
             /meta       [可选] 有关的表定义
             /filters    处理数据源用到的自定义的过滤器 （输入 ctx, row）
             /CaseInfo   与数据源相关的 Python 代码
+                /schema     索引中， 各字段的定义
+                - python 包， SQLAlchemy 风格的表结构定义
             /conf       对应的配置文件
             /dict       对应的分词法词库文件， 或 通过 RPC 方式时， 访问分词法的方式
             /log        [可选] 查询日志

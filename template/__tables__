@@ -1,0 +1,22 @@
+# 用于定义 索引涉及的表。 第一个为主表(可能存在多个 1vs1 关联)， 后续为 从表， 以及关联到主表的方式。 从表的数据可以被多个字段使用
+# 额外的，提供记录 字典表的机制
+# 文件的基本格式为 YAML
+
+main:
+    -
+        main_table_a:
+            pk:
+                columnA
+                columnB
+    -
+        main_table_b:
+            join:
+                columnnA: ccc
+                columnB: dd
+
+join:
+    -
+        join_table_c:
+            join:
+                columnC: ccc
+                columnA: dd

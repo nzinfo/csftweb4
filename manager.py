@@ -5,6 +5,7 @@
 
 import json
 import os
+import codecs
 import flask
 from flask import Flask
 from flask.ext.script import Manager, Command, Option
@@ -52,10 +53,10 @@ class DatabaseSchema(Command):
         Option("-f", "--force", dest='force_flag', metavar='force overwrite', required=False, default=False,
                help='switch force update'),
         Option(metavar='appname', dest='app_name', help='app name'),
-        Option(metavar='tblname', dest='tbl_name', help='table name', nargs='*'),
+        Option(metavar='tblname', dest='tbl_names', help='table name', nargs='*'),
     )
 
-    def run(self, debug_flag, action, force_flag, app_name, tbl_name):
+    def run(self, debug_flag, action, force_flag, app_name, tbl_names):
         """
             1 从配置文件中读取 App 的配置信息
             2 连接到数据库
@@ -68,14 +69,25 @@ class DatabaseSchema(Command):
             print ("No such app %s." % app_name)
             return
         app_config = app_config[app_name]
-        print app_config.keys()
+
         meta_path = os.path.join(os.path.abspath(app_config['BasePath']), 'meta')
         if 'Path' in app_config and 'meta' in app_config['Path']:
             meta_path = os.path.abspath(app_config['Path']['meta'])
 
+        if action == "import":
+            DatabaseSchema.action_generate_table_define(app, app_config, meta_path,
+                                                        debug_flag, force_flag, app_name, tbl_names)
+        if action == 'genpy':
+            DatabaseSchema.action_generate_sqlalchemy_define(app, app_config, meta_path,
+                                                             debug_flag, force_flag, app_name, tbl_names)
+        pass
+
+    @staticmethod
+    def action_generate_table_define(app, app_config, meta_path, debug_flag, force_flag, app_name, tbl_names):
         # check Schema
         with get_connection_by_app(app, app_config) as conn:
             insp = csftweb.DBInspector(conn)
+            # fixme: 1 check targe file's existance; 2 generate required tables only.
             for tbl in insp.tables():
                 tbl_def_filename = os.path.join(meta_path, tbl+".json")
                 tbl_def_path, _ = os.path.split(tbl_def_filename)
@@ -84,12 +96,35 @@ class DatabaseSchema(Command):
                     os.makedirs(tbl_def_path)
                 with open(tbl_def_filename, 'w') as fh:
                     json.dump(tbl_def.to_jsonable(), fh, indent=4, sort_keys=True)
-            #for row in conn.execute("select * from zd_lb"):
-            #    #print row
-            #    pass
-        pass
-        # end of file.
+        return
 
+    @staticmethod
+    def action_generate_sqlalchemy_define(app, app_config, meta_path, debug_flag, force_flag, app_name, tbl_names):
+        # 将用于生成 python code 所在的位置
+        app_name = app_config['AppName']
+        # touch files
+        sqlalchemy_schema_path = os.path.join(os.path.abspath(app_config['BasePath']), app_name, 'schema')
+        _init_pkg = os.path.join(os.path.abspath(app_config['BasePath']), app_name, '__init__.py')
+        _init_schema = os.path.join(os.path.abspath(app_config['BasePath']), app_name, 'schema', '__init__.py')
+        schema_file = "schema_%s.py" % app_name.lower()
+
+        # 确定目录存在
+        if not os.path.isdir(sqlalchemy_schema_path):
+            os.makedirs(sqlalchemy_schema_path)
+
+        open(_init_pkg, 'a').close()
+        # 初始化 schema
+        if not os.path.isfile(_init_schema):
+            with open(_init_schema, 'w') as fh:
+                fh.write("from schema_%s import *\n" % app_name.lower())
+
+        schema_file = os.path.join(sqlalchemy_schema_path, schema_file)
+        with get_connection_by_app(app, app_config) as conn:
+            code_gen = csftweb.DBSchemaCodeGen(conn)
+            ctx = code_gen.generate(meta_path, dialect='db2')
+            with codecs.open(schema_file, 'w', encoding='utf-8') as fh:
+                fh.write(ctx)
+        return
 
 class DatabaseConfig(Command):
     """

@@ -1,0 +1,6 @@
+sqlalchemy
+prettytable
+Flask>=0.9
+flask_jsontools
+Flask-Script>=0.5.1
+pyYAML
