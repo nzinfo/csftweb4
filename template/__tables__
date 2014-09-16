@@ -3,20 +3,33 @@
 # 文件的基本格式为 YAML
 
 main:
-    -
-        main_table_a:
-            pk:
-                columnA
-                columnB
-    -
-        main_table_b:
-            join:
-                columnnA: ccc
-                columnB: dd
+    main_table_a:
+        pk:
+            [columnA, columnB]
+
+    main_table_b:
+        join:
+            columnnA: ccc
+            columnB: dd
+        field:
+            [xxx, ddd]
 
 join:
-    -
-        join_table_c:
-            join:
-                columnC: ccc
-                columnA: dd
+    join_table_c:
+        join:
+            columnC: ccc
+            columnA: dd
+
+dict:
+    dict_table:
+        ccc:
+            column: [columnA, ccc]
+            type: 'index'
+
+        aaa:
+            column: [columnA, ccc]
+            type: 'index'
+
+        field:
+            - aaa
+            - ddd

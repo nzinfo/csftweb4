@@ -5,6 +5,7 @@
 
 import json
 import os
+import sys
 import codecs
 import flask
 from flask import Flask
@@ -49,7 +50,7 @@ class DatabaseSchema(Command):
     option_list = (
         Option("-d", "--debug", dest='debug_flag', action="count", required=False, default=0,
                help='debug flag'),
-        Option(metavar='action', dest='action', help='import|genpy'),
+        Option(metavar='action', dest='action', help='import|verify|genpy'),
         Option("-f", "--force", dest='force_flag', metavar='force overwrite', required=False, default=False,
                help='switch force update'),
         Option(metavar='appname', dest='app_name', help='app name'),
@@ -80,10 +81,14 @@ class DatabaseSchema(Command):
         if action == 'genpy':
             DatabaseSchema.action_generate_sqlalchemy_define(app, app_config, meta_path,
                                                              debug_flag, force_flag, app_name, tbl_names)
-        pass
+        if action == 'verify':
+            DatabaseSchema.action_verify_table_relation(app, app_config, debug_flag)
 
     @staticmethod
     def action_generate_table_define(app, app_config, meta_path, debug_flag, force_flag, app_name, tbl_names):
+        """
+            从数据库中，通过反射读取表信息，生成 JSON 形式的元信息
+        """
         # check Schema
         with get_connection_by_app(app, app_config) as conn:
             insp = csftweb.DBInspector(conn)
@@ -100,6 +105,9 @@ class DatabaseSchema(Command):
 
     @staticmethod
     def action_generate_sqlalchemy_define(app, app_config, meta_path, debug_flag, force_flag, app_name, tbl_names):
+        """
+            生成 SQLAlchemy 形式的 表格定义
+        """
         # 将用于生成 python code 所在的位置
         app_name = app_config['AppName']
         # touch files
@@ -125,6 +133,87 @@ class DatabaseSchema(Command):
             with codecs.open(schema_file, 'w', encoding='utf-8') as fh:
                 fh.write(ctx)
         return
+
+    @staticmethod
+    def action_verify_table_relation(app, app_config, debug_flag):
+        """
+            读取表关系定义 ，从 __table__ , 列印出机器自己的理解。
+            __table__ 的格式为 YAML
+                定义了， 主表（主表间的关系）， 从表（从表与主表的关系）， 字典表（字典表需要使用的索引），以及各表使用的字段
+                如果没有给出字段，则说明为 select * from table
+        """
+        import yaml
+        base_path = os.path.abspath(app_config['BasePath'])
+        meta_path = os.path.join(os.path.abspath(app_config['BasePath']), 'meta')
+
+        yaml_table_rel_define_filename = os.path.join(base_path, '__tables__')
+        table_rel = yaml.load(file(yaml_table_rel_define_filename, 'r'))
+
+        table_mgr = csftweb.DBMetaTableManager(app_config, meta_path)
+        rel_mgr = csftweb.DBTableRelation(app_config, table_rel, table_mgr)
+        # do the output
+        """
+            - 列出全部主表
+            - 列出主表直接的关联关系
+            - 列出全部从表 & 关联关系
+            - 列出全部涉及到的字段
+        """
+        main_tbl, sub_main_tbls = rel_mgr.get_main_tables()
+
+        # FIXME: move the following code to else where... too long.
+        """
+            输出主表关系
+        """
+        if True:  # the base(root) main table
+            fh = sys.stdout
+            fh.write('main table: {name}\n'.format(name=main_tbl))
+            fh.write('  primary key: [%s]\n\n' % ', '.join(rel_mgr.get_main_table_primary()))
+            # FIXME: output the select fields.
+
+        def output_main_tbl(tbl):
+            if True:
+                fh = sys.stdout
+                fh.write('main table: {name}\n'.format(name=tbl))
+                join_rel = rel_mgr.get_table_join_on(tbl)
+                fh.write('  join on: [%s]\n' % tbl)
+                for k in join_rel:
+                    fh.write('\t{k} = {v}\n'.format(k=k, v=join_rel[k]))
+                fh.write('\n')
+
+        def output_join_tbl(tbl):
+            fh = sys.stdout
+            fh.write('join table: {name}\n'.format(name=tbl))
+            join_rel = rel_mgr.get_table_join_on(tbl)
+            fh.write('  join on: [%s]\n' % tbl)
+            for k in join_rel:
+                fh.write('\t{k} = {v}\n'.format(k=k, v=join_rel[k]))
+            fh.write('\n')
+
+        def output_dict_tbl(tbl):
+            fh = sys.stdout
+            fh.write('dict table: {name}\n'.format(name=tbl))
+            idxs = rel_mgr.get_table_index(tbl)
+            fh.write('  index:\n')
+            for k in idxs:
+                fh.write('\t{k} = {v}\n'.format(k=k, v=idxs[k]['column']))
+            fh.write('\n')
+
+        for tbl in sub_main_tbls:
+            output_main_tbl(tbl)
+
+        """
+            输出关联表
+        """
+        sys.stdout.write('---------------------------------\n')
+        join_tbls = rel_mgr.get_join_tables()
+        for tbl in join_tbls:
+            output_join_tbl(tbl)
+
+        sys.stdout.write('---------------------------------\n')
+        dict_tbls = rel_mgr.get_dict_tables()
+        for tbl in dict_tbls:
+            output_dict_tbl(tbl)
+        #print table_rel
 
 class DatabaseConfig(Command):
     """
