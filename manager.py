@@ -44,6 +44,9 @@ def get_connection_by_app(app, app_config):
 
 class DatabaseSchema(Command):
     """
+        与表结构定义相关
+    """
+    """
         读取对应的数据库配置，
         - 此处的数据库名称，为配置文件中的名称
     """
@@ -145,6 +148,8 @@ class DatabaseSchema(Command):
         import yaml
         base_path = os.path.abspath(app_config['BasePath'])
         meta_path = os.path.join(os.path.abspath(app_config['BasePath']), 'meta')
+        if 'Path' in app_config and 'meta' in app_config['Path']:
+            meta_path = os.path.abspath(app_config['Path']['meta'])
 
         yaml_table_rel_define_filename = os.path.join(base_path, '__tables__')
         table_rel = yaml.load(file(yaml_table_rel_define_filename, 'r'))
@@ -215,6 +220,7 @@ class DatabaseSchema(Command):
             output_dict_tbl(tbl)
         #print table_rel
 
+
 class DatabaseConfig(Command):
     """
         命令行形式的全局配置
@@ -282,19 +288,73 @@ class DatabaseControl(Command):
 class DatabaseSync(Command):
     """
         同步数据
-        - [database] [table] 同步
-        - --all [database] [table] 同步全部数据
-        如果不给出具体的表名，则为全部表同步
+    """
+    """
+        sync index [--dry-run] app_name
+        sync main [--dry-run] app_name
+        sync delta [--dry-run] app_name
+        sync merge [--dry-run] app_name   把增量中更新的数据， 合并到主数据上（根据主键）
+        sync clean [--dry-run] app_name
+        Note:
+            需要记录的关系
+            block_id -> range_begin, range_end, count?
+            pk -> instance_id, block_id       instance_id ，具体在那个库（储存设备上）
+            block_id -> [pks]
     """
     option_list = (
         Option("-d", "--debug", dest='debug_flag', action="count", required=False, default=0,
                help='debug flag'),
-        Option("--all", dest='flag_full_sync', metavar='full sync', required=False, default=False,
-               help='do full sync'),
-        Option(metavar='dbname', dest='db_name', help='database to be sync'),
-        Option(metavar='tblname', dest='tbl_name', help='table name', nargs='?'),
+        Option(metavar='action', dest='action', help='index|main|delta|merge'),
+        Option("--dry-run", dest='dryrun_flag', metavar='dry run?', required=False, default=False,
+               help="dry run to see what's happening"),
+        Option(metavar='appname', dest='app_name', help='app name'),
     )
 
+    def run(self, debug_flag, action, dryrun_flag, app_name):
+        app = flask.current_app
+        app_config = app.config['APP']
+        app_name = app_name.lower()
+        if app_name not in app_config:
+            print ("No such app %s." % app_name)
+            return
+        app_config = app_config[app_name]
+
+        action_funcs = {
+            'index': DatabaseSync.action_index,
+        }
+
+        if action in action_funcs:
+            return action_funcs[action](app, app_config, debug_flag, dryrun_flag, app_name)
+
+    @staticmethod
+    def get_mgr(app_config):
+        import yaml
+        base_path = os.path.abspath(app_config['BasePath'])
+        meta_path = os.path.join(os.path.abspath(app_config['BasePath']), 'meta')
+        if 'Path' in app_config and 'meta' in app_config['Path']:
+            meta_path = os.path.abspath(app_config['Path']['meta'])
+
+        yaml_table_rel_define_filename = os.path.join(base_path, '__tables__')
+        table_rel = yaml.load(file(yaml_table_rel_define_filename, 'r'))
+
+        table_mgr = csftweb.DBMetaTableManager(app_config, meta_path)
+        rel_mgr = csftweb.DBTableRelation(app_config, table_rel, table_mgr)
+        return table_mgr, rel_mgr
+
+    @staticmethod
+    def action_index(app, app_config, debug_flag, dryrun_flag, app_name):
+        """
+        1 make storage wrap
+        2 make connect to db
+        3 make sync task
+        """
+        table_mgr, rel_mgr = DatabaseSync.get_mgr(app_config)
+        storage = csftweb.storage.create_storage(app_config)
+
+        with get_connection_by_app(app, app_config) as conn:
+            task = csftweb.tasks.DBSyncTaskInitDataBatch(table_mgr, rel_mgr, conn)
+            task.process(storage)
+        pass
 
 class DatabasePolicy(Command):
     """
@@ -394,39 +454,6 @@ class DatabaseRebuild(Command):
             pass
 
 
-class DatabaseSync(Command):
-    """
-        Sync Data from SQLDatabase -> ObjStore(LedisDB)
-    """
-    option_list = (
-        Option("-d", "--debug", dest='debug_flag', action="count", required=False, default=0,
-               help='debug flag'),
-        Option(metavar='schema', dest='db_schema', help='which schema create table in.'),
-        Option(metavar='name', dest='db_names', help='generate python code for which database(s)', nargs='+'),
-    )
-
-    def run(self, debug_flag, db_schema, db_names):
-        app = flask.current_app
-        for db in db_names:
-            conn_str = app.config['DATABASE_%s_DEV_URL' % db.upper()]
-            schema_cls_name = app.config['DATABASE_%s_SCHEMA_DEFINE' % db.upper()]
-            #print schema_cls_name
-            meta_path = app.config['%s_META_PATH' % db.upper()]
-            meta_path = os.path.abspath(meta_path)
-            app.db_engine = space.cs_create_engine(app, conn_str, True)
-            # set schema.
-            obj = space.load_class(schema_cls_name)
-            if obj is None:
-                print 'can not found %s.' % schema_cls_name
-                return
-
-            db_syncer = space.DBSync(app.db_engine)
-
-            obj = obj()         # create the schema object.
-            for tbl in obj._tables:
-                db_syncer.sync_table(tbl, obj._tables[tbl])
-                #print tbl
-
 
 def setup_manager(app):
     mgr = Manager(app)
@@ -434,7 +461,7 @@ def setup_manager(app):
     #mgr.add_command("config", DatabaseConfig())
     #mgr.add_command("channel", DatabaseChannel())
     #mgr.add_command("ctrl", DatabaseControl())
-    #mgr.add_command("sync", DatabaseSync())
+    mgr.add_command("sync", DatabaseSync())
     #mgr.add_command("index", DatabaseIndex())
     # TODO: runserver 有 两个模式  @meta @worker
     return mgr

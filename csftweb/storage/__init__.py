@@ -18,4 +18,4 @@
             * 为了避免反向查询时，出现数据不一致
         - 存储系统记录 增量索引、 实时索引 需要的 delta-mark.
 """
-
+from .st_factory import create_storage

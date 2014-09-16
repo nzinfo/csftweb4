@@ -1,15 +1,29 @@
-导出表信息
+[done]导出表信息
     schema import [-f] app_name [具体的表名]
     1 如果文件已经存在，导入失败
         - 除非使用参数 -f
     2 表结构目前保存为 json 形式，
         - 后续可选 YAML
 
-生成表对应的 Python 代码
+[done]生成表对应的 Python 代码
     schema genpy app_name
     - 生成对应的 SQLAlchemy 的定义
     - 目前只支持生成在一个大文件中， 后续需要分解为多个文件
 
-[调试]
-    - 列出全部的表名
-    - 列出表的全部字段名
+[]同步数据，处理主数据索引
+    sync main_index [--dry-run|--clean] app_name
+    1 生成后续需要的数据分片结构
+
+    如果 --dry-run， 则只显示 SQL 语句， 对于需要 实际数据才能继续的，默认
+        * 如果主键为字符， 则随机生成
+        * 如果主键为数字， 则 从 0 ~ 20000 （如果 2000 为步长，足够用）
+
+    如果 --clean 则清除 之前的全部分组信息 ，和 全部数据
+
+[]同步数据，处理全部数据
+    sync main [--dry-run] app_name
+
+[]同步增量数据
+    sync delta [--dry-run] app_name
+
+

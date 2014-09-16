@@ -65,6 +65,7 @@ APP = {
         'BasePath': './PartyInfo',
         'Path': {
         },
-
+        'Storage': 'fs',    # 支持的类型应该有 fs sqlite mysql ledis
+        #'StorageFS':  # 如果有，可以额外指定储存的中间状态的数据
     }
 }
