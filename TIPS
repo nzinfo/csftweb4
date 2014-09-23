@@ -1,2 +1,12 @@
 DB2 的连接字符串
 http://www.connectionstrings.com/ibm-db2/
+
+
+build global idf
+You can build an .idf file using indextool utility, by dumping dictionaries using --dumpdict switch first, then converting those to .idf format using --buildidf, then merging all .idf files across cluser using --mergeidf. Refer to Section 7.4, “indextool command reference” for more information.
+
+ondisk_attrs
+
+在 MySQL 中，记录 元素之间的关系
+
+数据按照 分片 id 做分组。类似 group_id

@@ -291,10 +291,12 @@ class DatabaseSync(Command):
     """
     """
         sync index [--dry-run] app_name
-        sync main [--dry-run] app_name
+        sync main  [--dry-run] app_name
         sync delta [--dry-run] app_name
         sync merge [--dry-run] app_name   把增量中更新的数据， 合并到主数据上（根据主键）
+        sync dict  [--dry-run] app_name    同步字典表的数据
         sync clean [--dry-run] app_name
+
         Note:
             需要记录的关系
             block_id -> range_begin, range_end, count?
@@ -321,6 +323,7 @@ class DatabaseSync(Command):
 
         action_funcs = {
             'index': DatabaseSync.action_index,
+            'dict':  DatabaseSync.action_dict,
         }
 
         if action in action_funcs:
@@ -355,6 +358,21 @@ class DatabaseSync(Command):
             task = csftweb.tasks.DBSyncTaskInitDataBatch(table_mgr, rel_mgr, conn)
             task.process(storage)
         pass
+
+    @staticmethod
+    def action_dict(app, app_config, debug_flag, dryrun_flag, app_name):
+        """
+        1 make storage wrap
+        2 make connect to db
+        3 make sync task
+        """
+        table_mgr, rel_mgr = DatabaseSync.get_mgr(app_config)
+        storage = csftweb.storage.create_storage(app_config)
+
+        with get_connection_by_app(app, app_config) as conn:
+            task = csftweb.tasks.DBSyncTaskSyncDictData(table_mgr, rel_mgr, conn)
+            task.process(storage)
+
 
 class DatabasePolicy(Command):
     """

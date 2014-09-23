@@ -38,7 +38,10 @@ class DBSyncTaskInitDataBatch(DBSyncTaskBase):
     def process(self, storage):
         """
             storage: 负责存储的接口
+            1 读取主表的主键
         """
+        main_tbl, sub_main_tbls = self._rel_mgr.get_main_tables()
+        print self._rel_mgr.get_main_table_primary()
         print storage
 
 
@@ -47,5 +50,18 @@ class DBSyncTaskSyncDataPackage(DBSyncTaskBase):
         针对一个 具体的数据分区， 填充数据
     """
 
+
+class DBSyncTaskSyncDictData(DBSyncTaskBase):
+    """
+        - 同步字典表的数据
+        - 创建特定关键词的索引
+    """
+    def process(self, storage):
+        """
+        1 读取系统中得全部字典表。 TODO: 指定具体的字典表
+        2 动态加载对应的 Schema 定义， 读取其中的表结构信息
+        3
+        """
+        pass
 
 # end of file

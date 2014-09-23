@@ -37,3 +37,8 @@
 
 [数据导入（增量）]
  -
+
+
+[MSSQL]
+    pymssql 驱动程序 Bug 较多， 使用 MSSQL 必须通过 ODBC,
+    pyodbc 依赖 unixODBC
